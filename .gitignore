@@ -9,6 +9,8 @@ venv/
 .env
 backend/.env
 frontend/.env
+PROMPT.txt
+cashflow-bot.zip
 
 # Data / databases
 backend/data/
