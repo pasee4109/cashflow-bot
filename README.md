@@ -13,6 +13,38 @@ Multi-user web app for **automated grid trading on TFEX** (and SET) through the
 
 ---
 
+## Project status
+
+**Feature-complete except the live Settrade connection** — everything below is
+built and tested in Demo mode. To go live, the only remaining step is for the
+account owner to **bind a real Settrade account** in the Accounts page (no code
+change needed); field names in the live API responses may need minor tweaks on
+first real connection.
+
+| Area | Status |
+|------|--------|
+| Google + dev login, multi-user | ✅ done & tested |
+| Multi-account binding, encryption, switching | ✅ done & tested |
+| Grid engine (ladder / ATR / tick / buyback) | ✅ done & tested |
+| Deploy, monitor, buyback, PnL | ✅ done & tested (Demo) |
+| Demo mode | ✅ done & tested |
+| Telegram alerts (per account) | ✅ done (UI + API) |
+| React frontend | ✅ done & builds |
+| Test suite + CI | ✅ `pytest` + GitHub Actions |
+| **Live Settrade API** | ⏳ pending real credentials |
+
+## Tests & CI
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest -q              # unit + API tests (Demo mode, no broker needed)
+python verify_demo.py  # readable end-to-end check → "PASS — 21/21"
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the backend tests, the demo
+verification, and the frontend build on every push.
+
 ## Architecture
 
 ```

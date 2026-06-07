@@ -5,6 +5,7 @@ Run: uvicorn app.main:app --reload  (from the backend/ directory)
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +21,15 @@ from .services.settrade_manager import manager as settrade_manager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("cashflow")
 
-app = FastAPI(title=settings.app_name, version="2.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    _resume_active_sessions()
+    yield
+
+
+app = FastAPI(title=settings.app_name, version="2.0.0", lifespan=lifespan)
 
 # Authlib stores the OAuth state in this signed session cookie.
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key,
@@ -46,12 +55,6 @@ def health():
     return {"status": "ok", "app": settings.app_name,
             "google_enabled": settings.google_enabled,
             "active_monitors": monitor_manager.active_count()}
-
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
-    _resume_active_sessions()
 
 
 def _resume_active_sessions():

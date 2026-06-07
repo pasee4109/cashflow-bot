@@ -85,6 +85,8 @@ input, select {
 .acct-head { display: flex; align-items: center; gap: 8px; }
 .acct-meta { color: var(--muted); font-size: 0.82rem; margin: 6px 0 10px; }
 .acct-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.tg-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.tg-form input { flex: 1; min-width: 140px; }
 
 /* ── Pills / banners ───────────────────────────────────── */
 .pill { background: #e2e8f0; color: #475569; padding: 2px 9px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }

@@ -11,6 +11,7 @@ export default function Accounts() {
   const [form, setForm] = useState(EMPTY);
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [tg, setTg] = useState({ open: null, bot_token: "", chat_id: "" });
 
   async function load() {
     setList(await api.list());
@@ -101,6 +102,10 @@ export default function Accounts() {
                       `Connected — deriv:${r.derivatives} equity:${r.equity} data:${r.market_data}`)}>
                     Test connect
                   </button>
+                  <button className="btn sm ghost" onClick={() =>
+                    setTg({ open: tg.open === a.id ? null : a.id, bot_token: "", chat_id: "" })}>
+                    Telegram
+                  </button>
                   <button className="btn sm danger" onClick={() => {
                     if (confirm(`Delete account "${a.label}"?`))
                       act(() => api.remove(a.id), () => "Account deleted");
@@ -108,6 +113,21 @@ export default function Accounts() {
                     Delete
                   </button>
                 </div>
+                {tg.open === a.id && (
+                  <div className="tg-form">
+                    <div className="muted">แจ้งเตือนผ่าน Telegram (เว้นว่างทั้งคู่ = ปิด)</div>
+                    <input placeholder="Bot Token" value={tg.bot_token}
+                      onChange={(e) => setTg({ ...tg, bot_token: e.target.value })} />
+                    <input placeholder="Chat ID" value={tg.chat_id}
+                      onChange={(e) => setTg({ ...tg, chat_id: e.target.value })} />
+                    <button className="btn sm" onClick={() =>
+                      act(() => api.telegram(a.id, { bot_token: tg.bot_token, chat_id: tg.chat_id }),
+                        (r) => (r.enabled ? "Telegram alerts enabled" : "Telegram alerts disabled"))
+                        .then(() => setTg({ open: null, bot_token: "", chat_id: "" }))}>
+                      Save
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
