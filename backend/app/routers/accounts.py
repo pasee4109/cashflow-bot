@@ -39,7 +39,7 @@ def _to_out(acc: BrokerAccount) -> BrokerAccountOut:
     return BrokerAccountOut(
         id=acc.id, label=acc.label, broker_id=acc.broker_id,
         app_id_masked=_mask(acc.app_id), account_no=acc.account_no,
-        account_type=acc.account_type, is_active=acc.is_active,
+        account_type=acc.account_type, is_demo=acc.is_demo, is_active=acc.is_active,
         has_pin=bool(acc.pin_enc), last_connected_at=acc.last_connected_at,
         created_at=acc.created_at,
     )
@@ -71,6 +71,23 @@ def create_account(payload: BrokerAccountCreate, db: Session = Depends(get_db),
         app_code=payload.app_code, account_no=payload.account_no,
         pin_enc=encrypt(payload.pin) if payload.pin else None,
         account_type=payload.account_type, is_active=first,  # first bound becomes active
+    )
+    db.add(acc)
+    db.commit()
+    db.refresh(acc)
+    return _to_out(acc)
+
+
+@router.post("/demo", response_model=BrokerAccountOut, status_code=201)
+def create_demo_account(account_type: str = "derivative", label: str = "Demo (simulated)",
+                        db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Create a simulated account with sample data — no real broker needed."""
+    first = db.scalar(select(BrokerAccount).where(BrokerAccount.user_id == user.id)) is None
+    acc = BrokerAccount(
+        user_id=user.id, label=label, broker_id="DEMO", app_id="DEMO-APP",
+        app_secret_enc=encrypt("demo"), app_code="DEMO", account_no="DEMO-0001",
+        pin_enc=encrypt("000000"), account_type=account_type,
+        is_demo=True, is_active=first,
     )
     db.add(acc)
     db.commit()

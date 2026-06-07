@@ -88,6 +88,7 @@ export default function Dashboard() {
     <div className="page">
       <div className="active-bar">
         <span className="pill blue">ACTIVE</span>
+        {active.is_demo && <span className="pill amber">DEMO</span>}
         <b>{active.label}</b>
         <span className="muted">{active.account_type} · broker {active.broker_id} · acct {active.account_no}</span>
         <Link to="/accounts" className="muted right">manage / switch →</Link>

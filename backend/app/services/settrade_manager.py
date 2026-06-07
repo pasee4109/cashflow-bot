@@ -42,6 +42,9 @@ class SettradeManager:
 
     def connect(self, account: BrokerAccount) -> SettradeClient:
         """(Re)build and cache a client for the given account."""
+        if account.is_demo:
+            return self._connect_demo(account)
+
         from settrade_v2 import Investor  # imported lazily so dev w/o pkg still boots
 
         app_secret = decrypt(account.app_secret_enc)
@@ -70,6 +73,19 @@ class SettradeManager:
         except Exception as e:  # noqa: BLE001
             logger.info("MarketData context unavailable for acct %s: %s", account.id, e)
 
+        with self._lock:
+            self._clients[account.id] = client
+        return client
+
+    def _connect_demo(self, account: BrokerAccount) -> SettradeClient:
+        from .demo import build_demo_contexts
+
+        equity, deriv, market = build_demo_contexts(account.account_type)
+        client = SettradeClient(account_id=account.id, pin="DEMO")
+        client.investor = object()  # non-None marks it "connected"
+        client.equity_ctx = equity
+        client.deriv_ctx = deriv
+        client.market_data_ctx = market
         with self._lock:
             self._clients[account.id] = client
         return client

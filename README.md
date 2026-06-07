@@ -120,6 +120,16 @@ python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().de
 
 ---
 
+## 🧪 Demo mode (try it without a Settrade account)
+
+Want to click through the whole app before you have Settrade Open API credentials?
+On the **Accounts** page click **+ Demo TFEX** (or **+ Demo SET**). This creates a
+**simulated** account with sample holdings, synthetic prices/ATR and a probabilistic
+fill engine — so you can refresh the portfolio, preview a grid, deploy it, and watch
+sell fills trigger buybacks with PnL accruing, all without touching a real broker.
+Demo accounts are tagged **DEMO** and never place real orders. Delete it any time and
+bind a real account when you're ready.
+
 ## Binding a Settrade account
 
 1. Sign in → go to **Accounts**.

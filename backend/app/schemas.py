@@ -51,6 +51,7 @@ class BrokerAccountOut(BaseModel):
     app_id_masked: str
     account_no: str
     account_type: str
+    is_demo: bool = False
     is_active: bool
     has_pin: bool
     last_connected_at: datetime | None = None

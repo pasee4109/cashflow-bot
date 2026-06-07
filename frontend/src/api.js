@@ -42,6 +42,7 @@ export const auth = {
 export const accounts = {
   list: () => api.get("/accounts"),
   create: (a) => api.post("/accounts", a),
+  createDemo: (type) => api.post(`/accounts/demo?account_type=${type}`),
   update: (id, a) => api.patch(`/accounts/${id}`, a),
   remove: (id) => api.del(`/accounts/${id}`),
   activate: (id) => api.post(`/accounts/${id}/activate`),

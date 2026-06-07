@@ -61,6 +61,18 @@ export default function Accounts() {
 
       {msg && <div className={msg.type === "ok" ? "banner ok" : "banner err"}>{msg.text}</div>}
 
+      <div className="banner ok demo-cta">
+        <span>🧪 อยากลองดู UI ก่อนมีบัญชี Settrade จริง? สร้าง <b>บัญชีเดโม</b> ที่มีข้อมูลจำลองครบ:</span>
+        <span className="demo-btns">
+          <button className="btn sm" onClick={() => act(() => api.createDemo("derivative"), () => "Demo TFEX account created")}>
+            + Demo TFEX
+          </button>
+          <button className="btn sm ghost" onClick={() => act(() => api.createDemo("equity"), () => "Demo SET account created")}>
+            + Demo SET
+          </button>
+        </span>
+      </div>
+
       <div className="cols">
         <div className="card">
           <h3>Bound accounts</h3>
@@ -71,6 +83,7 @@ export default function Accounts() {
                 <div className="acct-head">
                   <strong>{a.label}</strong>
                   {a.is_active && <span className="pill blue">ACTIVE</span>}
+                  {a.is_demo && <span className="pill amber">DEMO</span>}
                   <span className="pill">{a.account_type}</span>
                 </div>
                 <div className="acct-meta">

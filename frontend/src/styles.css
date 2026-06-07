@@ -89,6 +89,9 @@ input, select {
 /* ── Pills / banners ───────────────────────────────────── */
 .pill { background: #e2e8f0; color: #475569; padding: 2px 9px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
 .pill.blue { background: var(--blue); color: #fff; }
+.pill.amber { background: var(--amber); color: #fff; }
+.demo-cta { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #fffbeb; color: #92400e; }
+.demo-btns { display: flex; gap: 8px; }
 .banner { padding: 12px 14px; border-radius: 8px; font-size: 0.9rem; }
 .banner.ok { background: #dcfce7; color: #166534; }
 .banner.err, .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 8px; }

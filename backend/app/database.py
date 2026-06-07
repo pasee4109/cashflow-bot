@@ -41,3 +41,17 @@ def init_db() -> None:
     from . import models  # noqa: F401  (ensures models are registered)
 
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()
+
+
+def _ensure_columns() -> None:
+    """Tiny additive migration for SQLite (create_all won't ALTER tables)."""
+    if not settings.database_url.startswith("sqlite"):
+        return
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(broker_accounts)"))}
+        if cols and "is_demo" not in cols:
+            conn.execute(text(
+                "ALTER TABLE broker_accounts ADD COLUMN is_demo BOOLEAN DEFAULT 0"))
