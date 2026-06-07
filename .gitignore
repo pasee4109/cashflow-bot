@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Env / secrets
+.env
+backend/.env
+frontend/.env
+PROMPT.txt
+cashflow-bot.zip
+
+# Data / databases
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+state.db
+logs/
+
+# Node / frontend build
+node_modules/
+frontend/dist/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

@@ -1,23 +1,32 @@
-version: "3.9"
-
 services:
-  cashflow-ladder:
-    build: .
-    container_name: cashflow-ladder-bot
+  backend:
+    build: ./backend
+    container_name: cashflow-backend
     restart: unless-stopped
-    ports:
-      - "8501:8501"
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - SECRET_KEY=${SECRET_KEY:-change-me-long-random-string-please}
+      - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      # When running behind the frontend's nginx, the browser-visible callback
+      # is on the frontend origin (which proxies /api to this service).
+      - OAUTH_REDIRECT_URI=${OAUTH_REDIRECT_URI:-http://localhost:8080/api/auth/google/callback}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8080}
+      - ALLOW_DEV_LOGIN=${ALLOW_DEV_LOGIN:-true}
+      - DATABASE_URL=sqlite:////app/data/app.db
     volumes:
-      - bot-data:/app/data
-      - ./state.db:/app/state.db
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      - backend-data:/app/data
+    expose:
+      - "8000"
+
+  frontend:
+    build: ./frontend
+    container_name: cashflow-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
 
 volumes:
-  bot-data:
+  backend-data:

@@ -1,233 +1,225 @@
-# 📈 Cashflow Ladder Grid Bot
+# 📈 TFEX Cashflow Ladder — Grid Trading Web App
 
-Automated sell-ladder & buyback grid trading engine for the Thai stock market (SET) and derivatives exchange (TFEX), powered by the **settrade-v2** Python API.
+Multi-user web app for **automated grid trading on TFEX** (and SET) through the
+**Settrade Open API** (`settrade-v2`).
 
----
+- 🔐 **Login with Google** (OIDC). Multi-user — every person signs in with their own Google account.
+- 🔗 **Bind multiple Settrade accounts** per user. Credentials are **encrypted at rest** (Fernet) and you can **switch the active account** any time.
+- 📊 Portfolio dashboard, ATR-based grid preview, one-click deploy.
+- 🪜 Cashflow ladder engine: laddered sell orders capped at ±1 ATR, automatic **buyback** N ticks below each fill — ported from the original engine.
+- 🤖 Background monitors poll fills and trigger buybacks per session; optional **Telegram** alerts per account.
 
-## Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────┐
-│                  Streamlit UI (app.py)               │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
-│  │ Auth     │ │Portfolio │ │Grid      │ │Log     │ │
-│  │ Sidebar  │ │Dashboard │ │Preview   │ │Terminal │ │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └───┬────┘ │
-├───────┼────────────┼────────────┼────────────┼──────┤
-│       ▼            ▼            ▼            ▼      │
-│  ┌─────────┐  ┌──────────┐ ┌──────────┐ ┌────────┐ │
-│  │auth.py  │  │portfolio │ │grid_     │ │state_  │ │
-│  │         │  │.py       │ │engine.py │ │manager │ │
-│  └────┬────┘  └────┬─────┘ └────┬─────┘ └───┬────┘ │
-│       │            │            │            │      │
-│       ▼            ▼            ▼            ▼      │
-│  ┌──────────────────────────────────────────────┐   │
-│  │           settrade-v2 API Layer              │   │
-│  │  Investor → Equity / Derivatives / MarketData│   │
-│  └──────────────────────────────────────────────┘   │
-│       │                                    │        │
-│  ┌────▼─────┐  ┌──────────┐  ┌─────────────▼─────┐ │
-│  │order_    │  │market_   │  │telegram_notifier  │ │
-│  │monitor.py│  │rules.py  │  │.py                │ │
-│  └──────────┘  └──────────┘  └───────────────────┘ │
-│       │                                             │
-│       ▼                                             │
-│  ┌──────────┐                                       │
-│  │state.db  │  (SQLite — order persistence)         │
-│  └──────────┘                                       │
-└─────────────────────────────────────────────────────┘
-```
-
-## Module Map
-
-| File | Purpose |
-|------|---------|
-| `app.py` | Streamlit entry point — UI layout, controls, auto-refresh |
-| `auth.py` | Settrade v2 `Investor` initialization and context management |
-| `portfolio.py` | Fetch equity/derivative holdings, candlestick data, ATR calculation |
-| `grid_engine.py` | Core ladder logic — order generation, placement, buyback cycle |
-| `market_rules.py` | SET tick-size table, TFEX ticks, board-lot normalization |
-| `order_monitor.py` | Background thread polling order statuses, triggering buybacks |
-| `state_manager.py` | SQLite persistence — sessions, orders, logs |
-| `telegram_notifier.py` | Telegram Bot API alerts for all bot events |
-| `config.py` | Constants, defaults, file paths |
+> ⚠️ Trading involves real money and risk of loss. Test against a **sandbox/demo** broker account first. Not financial advice.
 
 ---
 
-## Trading Logic — How the Cashflow Ladder Works
+## Project status
 
-### 1. Grid Sizing (ATR-Based)
-The bot calculates the 14-period ATR of the selected asset. Sell orders are placed **only within ±1 ATR** from the last traded price, ensuring the grid adapts to current volatility rather than using fixed spacing.
+**Feature-complete except the live Settrade connection** — everything below is
+built and tested in Demo mode. To go live, the only remaining step is for the
+account owner to **bind a real Settrade account** in the Accounts page (no code
+change needed); field names in the live API responses may need minor tweaks on
+first real connection.
 
-### 2. Ladder Volume Distribution
-Volume is distributed with **increasing weight** at higher price levels:
+| Area | Status |
+|------|--------|
+| Google + dev login, multi-user | ✅ done & tested |
+| Multi-account binding, encryption, switching | ✅ done & tested |
+| Grid engine (ladder / ATR / tick / buyback) | ✅ done & tested |
+| Deploy, monitor, buyback, PnL | ✅ done & tested (Demo) |
+| Demo mode | ✅ done & tested |
+| Telegram alerts (per account) | ✅ done (UI + API) |
+| React frontend | ✅ done & builds |
+| Test suite + CI | ✅ `pytest` + GitHub Actions |
+| **Live Settrade API** | ⏳ pending real credentials |
 
-```
-Level 1 (closest):  1× weight  →  smallest volume
-Level 2:            2× weight
-Level 3:            3× weight
-Level 4:            4× weight
-Level 5 (farthest): 5× weight  →  largest volume
-```
-
-This means more shares/contracts are sold at higher (better) prices.
-
-### 3. Volume Normalization
-- **Equity (SET):** All volumes rounded down to board lots of **100 shares**
-- **Derivatives (TFEX):** All volumes are **integer contracts ≥ 1**
-
-### 4. Tick-Size Compliance
-The SET tick-size table is fully implemented:
-
-| Price Range (THB) | Tick Size |
-|---|---|
-| < 2 | 0.01 |
-| < 5 | 0.02 |
-| < 10 | 0.05 |
-| < 25 | 0.10 |
-| < 50 | 0.25 |
-| < 100 | 0.50 |
-| < 200 | 1.00 |
-| < 400 | 2.00 |
-| < 800 | 4.00 |
-| ≥ 800 | 6.00 |
-
-### 5. Buyback Cycle
-When a sell order is filled, the bot immediately places a **BUY limit order** N ticks below the execution price. This captures the spread as cashflow:
-
-```
-SELL filled @ 25.50  →  BUY placed @ 25.20  (3 ticks below)
-                        Cashflow = 0.30 × volume
-```
-
----
-
-## Setup & Deployment
-
-### Prerequisites
-- Python 3.10+
-- A Settrade Open API account (broker app credentials)
-
-### Option A — Local (Recommended for Development)
+## Tests & CI
 
 ```bash
-# Clone or copy the project
-cd cashflow_ladder
+cd backend
+pip install -r requirements-dev.txt
+pytest -q              # unit + API tests (Demo mode, no broker needed)
+python verify_demo.py  # readable end-to-end check → "PASS — 21/21"
+```
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate   # Linux/Mac
-# .venv\Scripts\activate    # Windows
+GitHub Actions (`.github/workflows/ci.yml`) runs the backend tests, the demo
+verification, and the frontend build on every push.
 
-# Install dependencies
+## Architecture
+
+```
+┌──────────────┐      /api (cookie auth)      ┌─────────────────────────────┐
+│  React (Vite)│ ───────────────────────────▶ │        FastAPI backend       │
+│  frontend    │ ◀─────────────────────────── │                              │
+└──────────────┘                              │  auth (Google OIDC + JWT)    │
+   Login · Accounts · Dashboard               │  accounts vault (encrypted)  │
+                                              │  portfolio · grid · monitor  │
+                                              └───────────────┬──────────────┘
+                                                              │ settrade-v2
+                                                ┌─────────────▼─────────────┐
+                                                │  Settrade Open API         │
+                                                │  Investor → Equity /        │
+                                                │  Derivatives / MarketData   │
+                                                └────────────────────────────┘
+                                                  SQLite/Postgres (users,
+                                                  accounts, sessions, orders, logs)
+```
+
+### Backend module map (`backend/app`)
+
+| Path | Purpose |
+|------|---------|
+| `main.py` | FastAPI app, middleware, router wiring, monitor resume on startup |
+| `config.py` | Env-driven settings (`pydantic-settings`) |
+| `database.py` / `models.py` | SQLAlchemy engine + ORM (User, BrokerAccount, GridSession, GridOrder, BotLog) |
+| `security.py` | Fernet encryption for credentials + JWT issue/verify |
+| `oauth.py` | Google OIDC client (Authlib) |
+| `deps.py` | `get_current_user`, `get_active_account` dependencies |
+| `routers/auth.py` | Google login/callback, dev-login, `/me`, logout |
+| `routers/accounts.py` | Bind / list / update / delete / **activate** / test-connect / telegram |
+| `routers/portfolio.py` | Portfolio of the active account |
+| `routers/grid.py` | Preview, deploy, sessions, stop/cancel |
+| `routers/logs.py` | Activity log feed |
+| `services/grid_logic.py` | Pure ladder/buyback math (tick-aware) |
+| `services/market_rules.py` | SET tick table + TFEX ticks + board-lot rules |
+| `services/trading.py` | Order placement / cancel / fill-polling |
+| `services/monitor.py` | Per-session background monitor threads |
+| `services/settrade_manager.py` | Per-account Settrade connection cache |
+| `services/portfolio.py` | Portfolio + ATR/candle fetch |
+| `services/telegram.py` | Per-account Telegram notifier |
+| `services/crud.py` | DB helpers for sessions/orders/logs |
+
+The original Streamlit single-user app is preserved under [`legacy_streamlit/`](./legacy_streamlit).
+
+---
+
+## Quick start (local dev)
+
+### 1. Backend
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# Run
-streamlit run app.py
+cp .env.example .env          # then edit (see below)
+uvicorn app.main:app --reload # http://localhost:8000
 ```
 
-The app opens at `http://localhost:8501`.
-
-### Option B — Docker (Recommended for VPS)
+### 2. Frontend
 
 ```bash
-# Build and run
-docker compose up -d --build
-
-# View logs
-docker compose logs -f
-
-# Stop
-docker compose down
+cd frontend
+npm install
+npm run dev                   # http://localhost:5173
 ```
 
-### Option C — Ubuntu VPS from Scratch
+The Vite dev server proxies `/api` → `http://localhost:8000`, so the auth cookie
+stays same-origin. Open **http://localhost:5173**.
+
+Without Google credentials configured you can use the **“Continue (dev)”** button
+(enabled by `ALLOW_DEV_LOGIN=true`) to sign in and exercise the full account-binding
+and grid flow.
+
+---
+
+## Configuring Google Sign-In
+
+1. Go to the [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials).
+2. Create an **OAuth 2.0 Client ID** (type: *Web application*).
+3. Add an **Authorised redirect URI** that matches `OAUTH_REDIRECT_URI`:
+   - Local dev: `http://localhost:8000/api/auth/google/callback`
+   - Docker compose: `http://localhost:8080/api/auth/google/callback`
+4. Put the client id/secret in `backend/.env`:
+
+```ini
+GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxxx
+OAUTH_REDIRECT_URI=http://localhost:8000/api/auth/google/callback
+FRONTEND_URL=http://localhost:5173
+ALLOW_DEV_LOGIN=false          # turn off dev login once Google works
+```
+
+Generate real secrets:
 
 ```bash
-# 1. Update system
-sudo apt update && sudo apt upgrade -y
-
-# 2. Install Docker
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-newgrp docker
-
-# 3. Install Docker Compose
-sudo apt install docker-compose-plugin -y
-
-# 4. Clone project
-git clone <your-repo> cashflow_ladder
-cd cashflow_ladder
-
-# 5. (Optional) Set Telegram env vars
-export TELEGRAM_BOT_TOKEN="your_bot_token"
-export TELEGRAM_CHAT_ID="your_chat_id"
-
-# 6. Deploy
-docker compose up -d --build
-
-# 7. (Optional) Set up systemd auto-restart
-sudo tee /etc/systemd/system/cashflow-ladder.service << 'EOF'
-[Unit]
-Description=Cashflow Ladder Grid Bot
-After=docker.service
-Requires=docker.service
-
-[Service]
-WorkingDirectory=/home/ubuntu/cashflow_ladder
-ExecStart=/usr/bin/docker compose up
-ExecStop=/usr/bin/docker compose down
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl enable cashflow-ladder
-sudo systemctl start cashflow-ladder
+python -c "import secrets;print(secrets.token_urlsafe(48))"               # SECRET_KEY
+python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())"  # APP_ENCRYPTION_KEY
 ```
 
----
-
-## Telegram Setup
-
-1. Message [@BotFather](https://t.me/BotFather) on Telegram → `/newbot`
-2. Copy the **Bot Token**
-3. Message your new bot, then visit:
-   `https://api.telegram.org/bot<TOKEN>/getUpdates`
-4. Find your **Chat ID** in the response JSON
-5. Enter both in the app sidebar under "Telegram Alerts"
+> `APP_ENCRYPTION_KEY` encrypts stored Settrade secrets. **If you change it, previously
+> stored credentials can no longer be decrypted** — rebind those accounts.
 
 ---
 
-## Configuration Reference
+## 🧪 Demo mode (try it without a Settrade account)
 
-All defaults are in `config.py`:
+Want to click through the whole app before you have Settrade Open API credentials?
+On the **Accounts** page click **+ Demo TFEX** (or **+ Demo SET**). This creates a
+**simulated** account with sample holdings, synthetic prices/ATR and a probabilistic
+fill engine — so you can refresh the portfolio, preview a grid, deploy it, and watch
+sell fills trigger buybacks with PnL accruing, all without touching a real broker.
+Demo accounts are tagged **DEMO** and never place real orders. Delete it any time and
+bind a real account when you're ready.
 
-| Parameter | Default | Description |
-|---|---|---|
-| `DEFAULT_ALLOCATION_PCT` | 30 | % of holding used per symbol |
-| `DEFAULT_GRID_LEVELS` | 5 | Number of sell ladder rungs |
-| `DEFAULT_BUYBACK_TICKS` | 3 | Ticks below execution for buyback |
-| `DEFAULT_LADDER_WEIGHTS` | [1,2,3,4,5] | Volume multipliers per level |
-| `ATR_PERIOD` | 14 | Bars for ATR calculation |
-| `ATR_GRID_LIMIT` | 1.0 | Max ± ATR from last price |
-| `ORDER_POLL_INTERVAL_SEC` | 5 | Order status check frequency |
+## Binding a Settrade account
 
----
+1. Sign in → go to **Accounts**.
+2. Click **Bind a new account** and fill in your Settrade Open API app credentials:
+   `Broker ID`, `App ID`, `App Secret`, `App Code`, `Account No`, and `PIN`
+   (the PIN is required to place/cancel orders). Pick `Derivative (TFEX)` or `Equity (SET)`.
+3. The first account you bind becomes **active** automatically. Bind as many as you like
+   and use **Set active** to switch. **Test connect** verifies the credentials against Settrade.
 
-## Safety Notes
-
-- **Credentials are held in memory only** — never written to disk or logs
-- The SQLite database stores order IDs and prices but **no credentials**
-- The bot uses **DAY validity** orders — all unfilled orders expire at session close
-- Use the **Allocation %** slider to limit exposure (default 30%)
-- Always test with a **sandbox/demo account** first
-- The bot does **not** use market orders — all orders are limit orders
+Secrets and PIN are stored encrypted; the API only ever returns a **masked** App ID and never the secret.
 
 ---
 
-## License
+## Using the bot
 
-For personal/educational use. Not financial advice. Trading involves risk of loss.
+On the **Dashboard** (drives the active account):
+
+1. **Refresh portfolio** to load your holdings.
+2. Tick the symbols you want to trade.
+3. Tune grid parameters (levels, buyback ticks, allocation %, ladder weights).
+4. **Preview grid** to see the sell ladder, buyback prices and cashflow per unit.
+5. **🚀 Deploy grids** — places the sell ladder and starts a background monitor per symbol.
+6. Watch **Grid sessions** (fills, buybacks, open orders, PnL) and the **Activity log**.
+   Pause/cancel individual sessions or **Stop all monitors**.
+
+Active monitors are resumed automatically when the backend restarts.
+
+---
+
+## Docker (both services)
+
+```bash
+# from repo root
+SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(48))") \
+APP_ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())") \
+docker compose up -d --build
+```
+
+Frontend on **http://localhost:8080** (nginx serves the SPA and proxies `/api`
+to the backend). Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` env vars (and the
+matching redirect URI) to enable Google login; otherwise leave `ALLOW_DEV_LOGIN=true`.
+
+---
+
+## Security notes
+
+- Settrade **App Secret** and **PIN** are encrypted with Fernet before being written to the DB; they are never returned by the API or logged.
+- Sessions use a short-lived signed **JWT** in an `httpOnly` cookie.
+- Set `COOKIE_SECURE=true` and serve over HTTPS in production.
+- All orders are **LIMIT / DAY** — no market orders; unfilled orders expire at session close.
+- Use the **Allocation %** control to cap exposure per symbol.
+
+## Trading logic (unchanged from the original engine)
+
+- **ATR-based sizing** — sells are placed only within **+1 ATR** of the last price.
+- **Weighted ladder** — more volume at higher (better) prices (`1×,2×,…`).
+- **Tick compliance** — full SET tick table; TFEX per-instrument ticks (S50, GF, …).
+- **Volume rules** — SET rounds down to 100-share board lots; TFEX integer contracts ≥ 1.
+- **Buyback cycle** — each filled sell places a BUY `N` ticks below the fill, capturing the spread as cashflow.
+
+For the detailed engine writeup see [`legacy_streamlit/README.md`](./legacy_streamlit/README.md).
